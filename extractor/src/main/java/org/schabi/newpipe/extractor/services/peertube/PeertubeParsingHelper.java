@@ -3,6 +3,7 @@ package org.schabi.newpipe.extractor.services.peertube;
 import com.grack.nanojson.JsonArray;
 import com.grack.nanojson.JsonObject;
 import org.schabi.newpipe.extractor.Image;
+import org.schabi.newpipe.extractor.InfoItemExtractor;
 import org.schabi.newpipe.extractor.InfoItemsCollector;
 import org.schabi.newpipe.extractor.Page;
 import org.schabi.newpipe.extractor.exceptions.ContentNotAvailableException;
@@ -122,23 +123,30 @@ public final class PeertubeParsingHelper {
         }
     }
 
+    public static void collectItemsFrom(final InfoItemsCollector collector,
+                                        final JsonObject json,
+                                        final String baseUrl) throws ParsingException {
+        collectItemsFrom(collector, json, baseUrl, false);
+    }
+
     /**
      * Collect items which may be streams, playlists or channels from a JSON response.
      *
      * <p>
-     * PeerTube's channel tab endpoints ({@code /videos}, {@code /video-playlists} and
-     * {@code /video-channels}) all answer with the same {@code data} envelope, so the type of
-     * every element is derived from its shape: playlists carry {@code videosLength} and channels
-     * carry {@code followingCount}, videos carry neither.
+     * PeerTube answers with the same {@code data} envelope whatever is being listed, so the type
+     * of every element is derived from its shape: playlists carry {@code videosLength} and
+     * channels carry {@code followingCount}, videos carry neither.
      * </p>
      *
      * @param collector the collector used to collect information
      * @param json      the JSON response to retrieve data from
      * @param baseUrl   the base URL of the instance
+     * @param sepia     if we should use {@link PeertubeSepiaStreamInfoItemExtractor} for streams
      */
     public static void collectItemsFrom(final InfoItemsCollector collector,
                                         final JsonObject json,
-                                        final String baseUrl) throws ParsingException {
+                                        final String baseUrl,
+                                        final boolean sepia) throws ParsingException {
         final JsonArray contents;
         try {
             contents = (JsonArray) JsonUtils.getValue(json, "data");
@@ -155,13 +163,17 @@ public final class PeertubeParsingHelper {
                     item = item.getObject("video");
                 }
 
+                final InfoItemExtractor extractor;
                 if (item.has("videosLength")) {
-                    collector.commit(new PeertubePlaylistInfoItemExtractor(item, baseUrl));
+                    extractor = new PeertubePlaylistInfoItemExtractor(item, baseUrl);
                 } else if (item.has("followingCount")) {
-                    collector.commit(new PeertubeChannelInfoItemExtractor(item, baseUrl));
+                    extractor = new PeertubeChannelInfoItemExtractor(item, baseUrl);
+                } else if (sepia) {
+                    extractor = new PeertubeSepiaStreamInfoItemExtractor(item, baseUrl);
                 } else {
-                    collector.commit(new PeertubeStreamInfoItemExtractor(item, baseUrl));
+                    extractor = new PeertubeStreamInfoItemExtractor(item, baseUrl);
                 }
+                collector.commit(extractor);
             }
         }
     }
