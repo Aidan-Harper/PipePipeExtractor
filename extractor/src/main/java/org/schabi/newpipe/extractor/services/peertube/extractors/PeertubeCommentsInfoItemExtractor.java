@@ -34,13 +34,9 @@ public class PeertubeCommentsInfoItemExtractor implements CommentsInfoItemExtrac
 
     @Override
     public String getThumbnailUrl() {
-        String value;
-        try {
-            value = JsonUtils.getString(item, "account.avatar.path");
-        } catch (final Exception e) {
-            value = "/client/assets/images/default-avatar.png";
-        }
-        return baseUrl + value;
+        return PeertubeParsingHelper.getBiggestImageUrl(
+                PeertubeParsingHelper.getAvatarsFromOwnerAccountOrVideoChannelObject(
+                        baseUrl, item.getObject("account")));
     }
 
     @Override
@@ -77,13 +73,9 @@ public class PeertubeCommentsInfoItemExtractor implements CommentsInfoItemExtrac
 
     @Override
     public String getUploaderAvatarUrl() {
-        String value;
-        try {
-            value = JsonUtils.getString(item, "account.avatar.path");
-        } catch (final Exception e) {
-            value = "/client/assets/images/default-avatar.png";
-        }
-        return baseUrl + value;
+        return PeertubeParsingHelper.getBiggestImageUrl(
+                PeertubeParsingHelper.getAvatarsFromOwnerAccountOrVideoChannelObject(
+                        baseUrl, item.getObject("account")));
     }
 
     @Override
