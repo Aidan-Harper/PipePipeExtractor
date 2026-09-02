@@ -2,10 +2,13 @@ package org.schabi.newpipe.extractor.services.peertube;
 
 import com.grack.nanojson.JsonArray;
 import com.grack.nanojson.JsonObject;
+import org.schabi.newpipe.extractor.InfoItemExtractor;
 import org.schabi.newpipe.extractor.InfoItemsCollector;
 import org.schabi.newpipe.extractor.Page;
 import org.schabi.newpipe.extractor.exceptions.ContentNotAvailableException;
 import org.schabi.newpipe.extractor.exceptions.ParsingException;
+import org.schabi.newpipe.extractor.services.peertube.extractors.PeertubeChannelInfoItemExtractor;
+import org.schabi.newpipe.extractor.services.peertube.extractors.PeertubePlaylistInfoItemExtractor;
 import org.schabi.newpipe.extractor.services.peertube.extractors.PeertubeSepiaStreamInfoItemExtractor;
 import org.schabi.newpipe.extractor.services.peertube.extractors.PeertubeStreamInfoItemExtractor;
 import org.schabi.newpipe.extractor.utils.JsonUtils;
@@ -104,6 +107,61 @@ public final class PeertubeParsingHelper {
 
                 final PeertubeStreamInfoItemExtractor extractor;
                 if (sepia) {
+                    extractor = new PeertubeSepiaStreamInfoItemExtractor(item, baseUrl);
+                } else {
+                    extractor = new PeertubeStreamInfoItemExtractor(item, baseUrl);
+                }
+                collector.commit(extractor);
+            }
+        }
+    }
+
+    public static void collectItemsFrom(final InfoItemsCollector collector,
+                                        final JsonObject json,
+                                        final String baseUrl) throws ParsingException {
+        collectItemsFrom(collector, json, baseUrl, false);
+    }
+
+    /**
+     * Collect items which may be streams, playlists or channels from a JSON response.
+     *
+     * <p>
+     * PeerTube answers with the same {@code data} envelope whatever is being listed, so the type
+     * of every element is derived from its shape: playlists carry {@code videosLength} and
+     * channels carry {@code followingCount}, videos carry neither.
+     * </p>
+     *
+     * @param collector the collector used to collect information
+     * @param json      the JSON response to retrieve data from
+     * @param baseUrl   the base URL of the instance
+     * @param sepia     if we should use {@link PeertubeSepiaStreamInfoItemExtractor} for streams
+     */
+    public static void collectItemsFrom(final InfoItemsCollector collector,
+                                        final JsonObject json,
+                                        final String baseUrl,
+                                        final boolean sepia) throws ParsingException {
+        final JsonArray contents;
+        try {
+            contents = (JsonArray) JsonUtils.getValue(json, "data");
+        } catch (final Exception e) {
+            throw new ParsingException("Unable to extract list info", e);
+        }
+
+        for (final Object c : contents) {
+            if (c instanceof JsonObject) {
+                JsonObject item = (JsonObject) c;
+
+                // PeerTube playlists have the stream info encapsulated in an "video" object
+                if (item.has("video")) {
+                    item = item.getObject("video");
+                }
+
+                final InfoItemExtractor extractor;
+                if (item.has("videosLength")) {
+                    extractor = new PeertubePlaylistInfoItemExtractor(item, baseUrl);
+                } else if (item.has("followingCount")) {
+                    extractor = new PeertubeChannelInfoItemExtractor(item, baseUrl);
+                } else if (sepia) {
                     extractor = new PeertubeSepiaStreamInfoItemExtractor(item, baseUrl);
                 } else {
                     extractor = new PeertubeStreamInfoItemExtractor(item, baseUrl);
